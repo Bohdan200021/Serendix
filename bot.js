@@ -281,8 +281,8 @@ bot.on('callback_query', async (query) => {
     await bot.sendMessage(
       chatId,
       selectedLanguage === 'en'
-        ? '📩 Contact us:\n✉️ info@serendix.com\n📞 +380123456789'
-        : "📩 Зв'яжіться з нами:\n✉️ info@serendix.com\n📞 +380123456789"
+        ? '📩 Contact us:\n✉️ itserendix@gmail.com\n📞 +380956584268'
+        : "📩 Зв'яжіться з нами:\n✉️ itserendix@gmail.com\n📞 +380956584268"
     );
   }
 
