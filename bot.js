@@ -1,102 +1,161 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
-const mongoose = require('mongoose');
-const Product = require('./productModel');
 const path = require('path');
 const express = require('express');
-const app = express();
+const fs = require('fs');
+const nodemailer = require('nodemailer');
 
+const app = express();
 app.use('/videos', express.static(path.join(__dirname, 'videos')));
 
-const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log('✅ MongoDB connected!');
-  } catch (err) {
-    console.error('❌ Connection error:', err.message);
-    process.exit(1);
-  }
-};
+const botToken = process.env.BOT_TOKEN;
+if (!botToken) {
+  console.error('❌ BOT_TOKEN не знайдено у файлі .env!');
+  process.exit(1);
+}
 
-const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(botToken, { polling: true });
+
 const VIDEO_EN_URL = './videos/Pro.mp4';
 const VIDEO_UK_URL = './videos/Pro.mp4';
 
-const categoryMenu = (lang) => {
-  const categories =
-    lang === 'en'
-      ? [
-          {
-            text: '🌐 Web Development',
-            callback_data: 'service_web_development',
-          },
-          {
-            text: '📱 Mobile App Development',
-            callback_data: 'service_mobile',
-          },
-          { text: '🔧 CRM/ERP Solutions', callback_data: 'service_crm' },
-          {
-            text: '🎨 Logo Design & Animations',
-            callback_data: 'service_logo',
-          },
-          {
-            text: '🤖 Business Automation Bots',
-            callback_data: 'service_bots',
-          },
-          {
-            text: '🛒 Marketplace Development',
-            callback_data: 'service_marketplace',
-          },
-          {
-            text: '🏗️ Platform Development',
-            callback_data: 'service_platform',
-          },
-          {
-            text: '📂 Personal Portfolio Development',
-            callback_data: 'service_portfolio',
-          },
-          { text: '📩 Contact Us', callback_data: 'contact' },
-        ]
-      : [
-          {
-            text: '🌐 Розробка вебсайтів',
-            callback_data: 'service_web_development',
-          },
-          {
-            text: '📱 Розробка мобільних додатків',
-            callback_data: 'service_mobile',
-          },
-          { text: '🔧 CRM/ERP рішення', callback_data: 'service_crm' },
-          {
-            text: '🎨 Дизайн логотипів та анімації',
-            callback_data: 'service_logo',
-          },
-          {
-            text: '🤖 Боти для автоматизації бізнесу',
-            callback_data: 'service_bots',
-          },
-          {
-            text: '🛒 Розробка маркетплейсів',
-            callback_data: 'service_marketplace',
-          },
-          { text: '🏗️ Розробка платформ', callback_data: 'service_platform' },
-          {
-            text: '📂 Розробка персональних портфоліо',
-            callback_data: 'service_portfolio',
-          },
-          { text: "📩 Зв'яжіться з нами", callback_data: 'contact' },
-        ];
+let selectedCategory = '';
+let selectedLanguage = 'en';
+let selectedBudget = '';
 
-  return {
-    reply_markup: {
-      inline_keyboard: categories.map((cat) => [cat]),
-    },
-  };
-};
+// Меню вибору категорій
+const categoryMenu = (lang) => ({
+  reply_markup: {
+    inline_keyboard:
+      lang === 'en'
+        ? [
+            [
+              {
+                text: '🌐 Web Development',
+                callback_data: 'service_web_development',
+              },
+            ],
+            [
+              {
+                text: '📱 Mobile App Development',
+                callback_data: 'service_mobile',
+              },
+            ],
+            [{ text: '🔧 CRM/ERP Solutions', callback_data: 'service_crm' }],
+            [
+              {
+                text: '🎨 Logo Design & Animations',
+                callback_data: 'service_logo',
+              },
+            ],
+            [
+              {
+                text: '🤖 Business Automation Bots',
+                callback_data: 'service_bots',
+              },
+            ],
+            [
+              {
+                text: '🛒 Marketplace Development',
+                callback_data: 'service_marketplace',
+              },
+            ],
+            [
+              {
+                text: '🏗️ Platform Development',
+                callback_data: 'service_platform',
+              },
+            ],
+            [
+              {
+                text: '📂 Personal Portfolio Development',
+                callback_data: 'service_portfolio',
+              },
+            ],
+            [{ text: '📩 Contact Us', callback_data: 'contact' }],
+          ]
+        : [
+            [
+              {
+                text: '🌐 Розробка вебсайтів',
+                callback_data: 'service_web_development',
+              },
+            ],
+            [
+              {
+                text: '📱 Розробка мобільних додатків',
+                callback_data: 'service_mobile',
+              },
+            ],
+            [{ text: '🔧 CRM/ERP рішення', callback_data: 'service_crm' }],
+            [
+              {
+                text: '🎨 Дизайн логотипів та анімації',
+                callback_data: 'service_logo',
+              },
+            ],
+            [
+              {
+                text: '🤖 Боти для автоматизації бізнесу',
+                callback_data: 'service_bots',
+              },
+            ],
+            [
+              {
+                text: '🛒 Розробка маркетплейсів',
+                callback_data: 'service_marketplace',
+              },
+            ],
+            [
+              {
+                text: '🏗️ Розробка платформ',
+                callback_data: 'service_platform',
+              },
+            ],
+            [
+              {
+                text: '📂 Розробка персональних портфоліо',
+                callback_data: 'service_portfolio',
+              },
+            ],
+            [{ text: "📩 Зв'яжіться з нами", callback_data: 'contact' }],
+          ],
+  },
+});
 
+// Меню вибору бюджету
+const budgetMenu = (lang) => ({
+  reply_markup: {
+    inline_keyboard: [
+      [
+        {
+          text: lang === 'en' ? '💵 < $1,000' : '💵 Менше $1,000',
+          callback_data: 'budget_low',
+        },
+      ],
+      [
+        {
+          text: lang === 'en' ? '$1,000 – $5,000' : '$1,000 – $5,000',
+          callback_data: 'budget_mid',
+        },
+      ],
+      [
+        {
+          text: lang === 'en' ? '$5,000 – $10,000' : '$5,000 – $10,000',
+          callback_data: 'budget_high',
+        },
+      ],
+      [
+        {
+          text: lang === 'en' ? '> $10,000' : 'Більше $10,000',
+          callback_data: 'budget_premium',
+        },
+      ],
+    ],
+  },
+});
+
+// Меню вибору мови
 const languageMenu = {
   reply_markup: {
     inline_keyboard: [
@@ -106,30 +165,13 @@ const languageMenu = {
   },
 };
 
-const budgetMenu = {
-  reply_markup: {
-    inline_keyboard: [
-      [{ text: '💵 Up to 1000$', callback_data: 'budget_1000' }],
-      [{ text: '💸 1000$ - 5000$', callback_data: 'budget_5000' }],
-      [{ text: '💰 5000$ - 10 000$', callback_data: 'budget_10000' }],
-      [{ text: '💎 10 000$+', callback_data: 'budget_more' }],
-    ],
-  },
-};
-
-let selectedCategory = '';
-let selectedBudget = '';
-let selectedLanguage = 'en';
-
+// Старт
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  try {
-    await bot.sendMessage(chatId, 'Please choose your language:', languageMenu);
-  } catch (error) {
-    console.error('❌ Error sending message:', error.message);
-  }
+  await bot.sendMessage(chatId, 'Please choose your language:', languageMenu);
 });
 
+// Обробка callback'ів
 bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id;
   const data = query.data;
@@ -145,16 +187,17 @@ bot.on('callback_query', async (query) => {
       }`
     );
     await bot.sendVideo(chatId, videoUrl);
-
     await bot.sendMessage(
       chatId,
-      'Welcome! Please choose a service category:',
+      selectedLanguage === 'en'
+        ? 'Please choose a service category:'
+        : 'Оберіть категорію послуги:',
       categoryMenu(selectedLanguage)
     );
   }
 
   if (data.startsWith('service_')) {
-    selectedCategory = data.split('_')[1];
+    selectedCategory = data;
     const serviceText = {
       service_web_development:
         selectedLanguage === 'en'
@@ -192,57 +235,45 @@ bot.on('callback_query', async (query) => {
 
     await bot.sendMessage(
       chatId,
-      `${serviceText}\n\n💲 Please indicate your budget:`,
-      budgetMenu
+      `${serviceText}\n\n${
+        selectedLanguage === 'en'
+          ? 'Please select your development budget:'
+          : 'Оберіть бажаний бюджет на розробку:'
+      }`,
+      budgetMenu(selectedLanguage)
     );
   }
 
   if (data.startsWith('budget_')) {
-    selectedBudget = data.split('_')[1];
-    const budgetText = {
-      budget_1000:
-        selectedLanguage === 'en'
-          ? '💲 Your budget: up to 1000$.'
-          : '💲 Ваш бюджет: до 1000$.',
-      budget_5000:
-        selectedLanguage === 'en'
-          ? '💲 Your budget: 1000$ - 5000$.'
-          : '💲 Ваш бюджет: 1000$ - 5000$.',
-      budget_10000:
-        selectedLanguage === 'en'
-          ? '💲 Your budget: 5000$ - 10 000$.'
-          : '💲 Ваш бюджет: 5000$ - 10 000$.',
-      budget_more:
-        selectedLanguage === 'en'
-          ? '💲 Your budget: 10 000$+.'
-          : '💲 Ваш бюджет: 10 000$+.',
-    }[data];
+    const budgetMap = {
+      budget_low: '< $1,000',
+      budget_mid: '$1,000 – $5,000',
+      budget_high: '$5,000 – $10,000',
+      budget_premium: '> $10,000',
+    };
+    selectedBudget = budgetMap[data];
 
-    await bot.sendMessage(
-      chatId,
-      `${budgetText}\n👤 Please provide your name:`
-    );
-    bot.once('message', async (msg) => {
-      const name = msg.text;
-      await bot.sendMessage(
-        chatId,
-        `Thank you, ${name}! ✅ Now please allow us to send your phone number.`
-      );
+    const contactPrompt =
+      selectedLanguage === 'en'
+        ? '📱 Please share your contact number so our manager can reach you:'
+        : '📱 Поділіться, будь ласка, номером телефону для звʼязку з менеджером:';
 
-      const phoneKeyboard = {
-        reply_markup: {
-          one_time_keyboard: true,
-          keyboard: [
-            [{ text: '📱 Send my phone number', request_contact: true }],
+    await bot.sendMessage(chatId, contactPrompt, {
+      reply_markup: {
+        keyboard: [
+          [
+            {
+              text:
+                selectedLanguage === 'en'
+                  ? '📞 Share Contact'
+                  : '📞 Поділитися контактом',
+              request_contact: true,
+            },
           ],
-        },
-      };
-
-      await bot.sendMessage(
-        chatId,
-        'Tap the button to share your number:',
-        phoneKeyboard
-      );
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
     });
   }
 
@@ -258,40 +289,40 @@ bot.on('callback_query', async (query) => {
   bot.answerCallbackQuery(query.id);
 });
 
+// Обробка контакту
 bot.on('contact', async (msg) => {
   const chatId = msg.chat.id;
-  const userName = msg.contact.first_name;
   const userPhone = msg.contact.phone_number;
+  const userName = msg.contact.first_name;
+
+  await bot.sendMessage(
+    chatId,
+    `✅ ${
+      selectedLanguage === 'en' ? 'Thank you!' : 'Дякуємо!'
+    }\n📞 ${userPhone} received.\n📬 Our manager will contact you shortly.`
+  );
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: 'bogdan.bigun2000@gmail.com',
+    subject: '🔔 Новий контакт з Telegram бота',
+    text: `Ім’я: ${userName}\nКатегорія: ${selectedCategory}\nБюджет: ${selectedBudget}\nТелефон: ${userPhone}\nЧас: ${new Date().toLocaleString()}`,
+  };
 
   try {
-    await bot.sendMessage(
-      chatId,
-      `📱 You shared your phone number: ${userPhone}. Our manager will contact you soon.`
-    );
-    console.log(`Name: ${userName}, Phone: ${userPhone}`);
-
-    const product = new Product({
-      name: userName,
-      category: selectedCategory,
-      priceRange: selectedBudget,
-      phoneNumber: userPhone,
-    });
-
-    await product.save();
-
-    const savedProduct = await Product.findOne({ phoneNumber: userPhone });
-
-    if (savedProduct) {
-      console.log('📦 Product saved to database!');
-      console.log('Product data:', savedProduct);
-    } else {
-      console.log('❌ Error: Product not saved in database');
-    }
+    await transporter.sendMail(mailOptions);
+    console.log('📧 Email sent successfully!');
   } catch (error) {
-    console.error('❌ Error saving data:', error.message);
+    console.error('❌ Error sending email:', error.message);
   }
 });
 
-connectDB().then(() => {
-  console.log('🤖 Bot started!');
-});
+console.log('🤖 Bot started!');

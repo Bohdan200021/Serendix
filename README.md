@@ -1,2 +1,0 @@
-# Serendix
-Serendix_bot
